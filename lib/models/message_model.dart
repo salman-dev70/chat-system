@@ -7,7 +7,7 @@ class MessageModel {
   final String receiverId;
   final String message;
   final DateTime timestamp;
-  final bool isRead; // ✅ ye field add karna hai
+  final bool isRead;
 
   MessageModel({
     required this.id,
@@ -16,17 +16,17 @@ class MessageModel {
     required this.receiverId,
     required this.message,
     required this.timestamp,
-    this.isRead = false, // default false
+    this.isRead = false,
   });
 
   factory MessageModel.fromMap(Map<String, dynamic> map, String docId) {
     return MessageModel(
       id: docId,
-      chatId: map['chatId'],
-      senderId: map['senderId'],
-      receiverId: map['receiverId'],
-      message: map['message'],
-      timestamp: (map['timestamp'] as Timestamp).toDate(),
+      chatId: map['chatId'] ?? "",
+      senderId: map['senderId'] ?? "",
+      receiverId: map['receiverId'] ?? "",
+      message: map['message'] ?? "",
+      timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: map['isRead'] ?? false,
     );
   }

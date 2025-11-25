@@ -1,5 +1,8 @@
 import 'dart:developer';
 
+import 'package:chat_system/controller/auth_controller.dart';
+import 'package:chat_system/models/message_model.dart';
+import 'package:chat_system/view/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/all_chats_controller.dart';
@@ -13,14 +16,27 @@ class HomeScreen extends StatelessWidget {
   final AllChatsController allChatsController = Get.find<AllChatsController>();
   final UserController userController = Get.find<UserController>();
   final ChatController chatController = Get.find<ChatController>();
+  final AuthController authController = Get.find<AuthController>();
 
   @override
   Widget build(BuildContext context) {
+    log(" Current User ID: ${userController.currentUserId}");
+    log(" All Users Count: ${userController.allUsers.length}");
+    log(" All Chats Count: ${allChatsController.allChats.length}");
     return DefaultTabController(
       length: 2, // Chats & Users
       child: Scaffold(
         appBar: AppBar(
           title: Text('Home'),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.logout, color: Colors.black),
+              onPressed: () async {
+                log("User logged out");
+                await authController.signOut();
+              },
+            ),
+          ],
           bottom: TabBar(tabs: [Tab(text: 'Chats'), Tab(text: 'Users')]),
         ),
         body: TabBarView(
@@ -74,22 +90,30 @@ class HomeScreen extends StatelessWidget {
                       ],
                     ),
                     title: Text(otherUser?.name ?? 'Unknown'),
-                    subtitle: Text(chat.lastMessage),
-                    trailing:
-                        allChatsController.unreadCounts[chat.id] != null &&
-                                allChatsController.unreadCounts[chat.id]! > 0
-                            ? CircleAvatar(
-                              radius: 12,
-                              backgroundColor: Colors.red,
-                              child: Text(
-                                '${allChatsController.unreadCounts[chat.id]}',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            )
-                            : null,
+                    subtitle: Obx(() {
+                      MessageModel? lastMsg =
+                          allChatsController.lastMessages[chat.id];
+                      if (lastMsg == null) {
+                        return Text(chat.lastMessage);
+                      }
+                      return Text(lastMsg.message);
+                    }),
+                    trailing: Obx(() {
+                      int? count = allChatsController.unreadCounts[chat.id];
+
+                      if (count != null && count > 0) {
+                        return CircleAvatar(
+                          radius: 12,
+                          backgroundColor: Colors.red,
+                          child: Text(
+                            '$count',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        );
+                      } else {
+                        return SizedBox();
+                      }
+                    }),
                     onTap: () {
                       chatController.initChat(chat.id);
                       chatController.otherUser.value = otherUser;
@@ -163,12 +187,9 @@ class HomeScreen extends StatelessWidget {
                       await chatController.createOrGetChat(
                         otherUser: otherUser,
                       );
-                      log(otherUser.name);
-                      if (chatController.otherUser.value != null) {
-                        Get.to(() => ChatScreen());
-                      } else {
-                        Get.snackbar("Error", "Other user not loaded yet");
-                      }
+
+                      log("Navigating to chat with: ${otherUser.name}");
+                      Get.to(() => ChatScreen());
                     },
                   );
                 },

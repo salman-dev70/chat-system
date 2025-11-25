@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:chat_system/models/user_model.dart';
 import 'package:chat_system/service/auth_service.dart';
 
@@ -65,5 +67,15 @@ class AuthRepo {
   // get all login users
   Stream<List<UserModel>> getAllUsersStream() {
     return _authService.getAllUsersStream();
+  }
+
+  // logout
+  Future<void> logout() async {
+    try {
+      await _authService.logout();
+      log("user log out");
+    } catch (e) {
+      throw Exception('Failed to logout: $e');
+    }
   }
 }

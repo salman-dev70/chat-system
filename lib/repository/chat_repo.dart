@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:chat_system/models/chat_model.dart';
 import 'package:chat_system/models/message_model.dart';
 import 'package:chat_system/service/chat_service.dart';
@@ -9,10 +11,12 @@ class ChatRepo {
   String get currentUserId => _chatService.currentUserId;
 
   // create or get chat room between two users
-  Future<String?> getOrCreateChatId(String userId, String otherUserId) async {
+  Future<String> getOrCreateChatId(String userId, String otherUserId) async {
     try {
+      log('Getting or creating chat ID for $userId and $otherUserId');
       return await _chatService.getOrCreateChatId(userId, otherUserId);
     } catch (e) {
+      log('Error in getOrCreateChatId: $e', level: 1000);
       throw Exception('Failed to get or create chat ID: $e');
     }
   }

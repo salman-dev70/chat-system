@@ -11,28 +11,25 @@ class ChatService {
 
   // create or get chat room between two users
 
-  Future<String?> getOrCreateChatId(String userId, String otherUserId) async {
-    final chatRef = _firestore.collection('chats');
+  Future<String> getOrCreateChatId(String userId, String otherUserId) async {
+    List<String> uids = [userId, otherUserId];
+    uids.sort();
+    String chatId = uids.join('_');
 
-    // Check if chat already exists
-    final querySnapshot =
-        await chatRef.where('participants', arrayContains: userId).get();
-    for (var doc in querySnapshot.docs) {
-      final users = List<String>.from(doc['users']);
-      if (users.contains(otherUserId)) {
-        return doc.id;
-      }
+    final chatRef = _firestore.collection('chats').doc(chatId);
+    final docSnapshot = await chatRef.get();
+
+    // check if chat already exists
+    if (!docSnapshot.exists) {
+      await chatRef.set({
+        'users': [userId, otherUserId],
+        'lastMessage': '',
+        'lastMessageTime': Timestamp.now(),
+        'unreadCount': {userId: 0, otherUserId: 0},
+      });
     }
 
-    // Create new chat if not exists
-    final newChatDoc = await chatRef.doc();
-    await newChatDoc.set({
-      'users': [userId, otherUserId],
-      'lastMessage': '',
-      'lastMessageTime': DateTime.now(),
-      'unreadCount': {userId: 0, otherUserId: 0},
-    });
-    return newChatDoc.id;
+    return chatId;
   }
 
   // Send message
@@ -44,11 +41,7 @@ class ChatService {
     required String receiverId,
   }) async {
     final messageRef =
-        _firestore
-            .collection('chats')
-            .doc('chatId')
-            .collection('messages')
-            .doc();
+        _firestore.collection('chats').doc(chatId).collection('messages').doc();
 
     final Timestamp timestamp = Timestamp.now();
 
@@ -58,6 +51,7 @@ class ChatService {
       'receiverId': receiverId,
       'message': message,
       'timestamp': timestamp,
+      'isRead': false,
     });
 
     // update chat last mesasge and read count

@@ -12,18 +12,7 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // get Current user
-  UserModel? get currentUser {
-    final user = _auth.currentUser;
-    if (user != null) {
-      return UserModel(
-        uid: user.uid,
-        name: user.displayName ?? '',
-        image: user.photoURL ?? '',
-        isOnline: true,
-      );
-    }
-    return null;
-  }
+  User? get currentUser => _auth.currentUser;
 
   // google Signin
 
@@ -117,5 +106,17 @@ class AuthService {
                   .map((doc) => UserModel.fromJson(doc.data()))
                   .toList(),
         );
+  }
+
+  // logout method
+  Future<void> logout() async {
+    await _googleSignIn.disconnect();
+    log("disconnect from google");
+    await _auth.signOut();
+    log("sign out from firebase");
+    await _googleSignIn.signOut();
+    log('sign out from google sign in');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('uid');
   }
 }

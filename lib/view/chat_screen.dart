@@ -1,3 +1,4 @@
+import 'package:chat_system/controller/users_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chat_system/controller/chat_controller.dart';
@@ -5,17 +6,24 @@ import 'package:chat_system/models/message_model.dart';
 
 class ChatScreen extends StatelessWidget {
   final ChatController chatController = Get.find<ChatController>();
+  final UserController userController = Get.find<UserController>();
   final TextEditingController messageController = TextEditingController();
 
   ChatScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    print(
+      "ChatScreen building. Current User UID: ${userController.currentUser.value?.uid}",
+    );
+    print(
+      "ChatScreen building. Other User UID: ${chatController.otherUser.value?.uid}",
+    );
     return Scaffold(
       appBar: AppBar(
         title: Obx(() {
           final ouser = chatController.otherUser.value;
-          if (ouser == null) return Text("Chat");
+          if (ouser == null) return Text("Loading...");
 
           return Row(
             children: [
@@ -33,13 +41,13 @@ class ChatScreen extends StatelessWidget {
             child: Obx(() {
               final msgs = chatController.messages;
               final ouser = chatController.otherUser.value;
-
-              if (ouser == null) {
-                return Center(child: Text("Loading chat..."));
+              final currentUser = userController.currentUser.value;
+              if (ouser == null || currentUser == null) {
+                return Center(child: CircularProgressIndicator());
               }
 
               if (msgs.isEmpty) {
-                return Center(child: Text("No messages yet"));
+                return Center(child: Text("Say Hello"));
               }
 
               return ListView.builder(
@@ -47,10 +55,8 @@ class ChatScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(10),
                 itemCount: msgs.length,
                 itemBuilder: (context, index) {
-                  final MessageModel msg = msgs[msgs.length - 1 - index];
-                  final isMe =
-                      msg.senderId ==
-                      chatController.userController.currentUser.value!.uid;
+                  final MessageModel msg = msgs[index];
+                  final isMe = msg.senderId == currentUser.uid;
 
                   return Align(
                     alignment:
@@ -99,13 +105,14 @@ class ChatScreen extends StatelessWidget {
                     final text = messageController.text.trim();
                     if (text.isEmpty) return;
 
-                    final ouser = chatController.otherUser.value;
-                    if (ouser == null) {
+                    final otherUserId = chatController.otherUser.value?.uid;
+
+                    if (otherUserId == null) {
                       Get.snackbar("Error", "Other user not loaded yet");
                       return;
                     }
 
-                    await chatController.sendMessage(text, ouser.uid);
+                    chatController.sendMessage(text, otherUserId);
                     messageController.clear();
                   },
                 ),

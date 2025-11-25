@@ -1,5 +1,9 @@
+import 'package:chat_system/bindings/app_binding.dart';
+import 'package:chat_system/controller/all_chats_controller.dart';
+import 'package:chat_system/controller/users_controller.dart';
 import 'package:chat_system/models/user_model.dart';
 import 'package:chat_system/repository/auth_repo.dart';
+import 'package:chat_system/view/login_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 
@@ -9,9 +13,10 @@ class AuthController extends GetxController with WidgetsBindingObserver {
 
   Rx<UserModel?> currentUser = Rx<UserModel?>(null);
 
+  var isLoading = false.obs;
+
   @override
   void onInit() {
-    // TODO: implement onInit
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     _checkSavedUser();
@@ -40,13 +45,16 @@ class AuthController extends GetxController with WidgetsBindingObserver {
   // google sign in
 
   Future<void> signInWithGoogle() async {
+    isLoading.value = true;
     try {
       final user = await _authRepo.signInWithGoogle();
       currentUser.value = user;
       if (user != null) {
         await _authRepo.setOnline(user.uid);
       }
+      isLoading.value = false;
     } catch (e) {
+      isLoading.value = false;
       Get.snackbar("SignIn falied", e.toString());
     }
   }
@@ -63,6 +71,27 @@ class AuthController extends GetxController with WidgetsBindingObserver {
       }
     } catch (e) {
       Get.snackbar("Error", e.toString());
+    }
+  }
+
+  // sign out
+  Future<void> signOut() async {
+    final UserController userController = Get.find<UserController>();
+    try {
+      if (currentUser.value != null) {
+        final String currentUserId = currentUser.value!.uid;
+
+        await _authRepo.setOffline(currentUserId);
+      } else {}
+
+      await _authRepo.logout();
+
+      currentUser.value = null;
+      userController.clearUserData();
+
+      Get.offAll(() => LoginScreen());
+    } catch (e) {
+      Get.snackbar("Sign Out failed", e.toString());
     }
   }
 }

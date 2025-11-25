@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:chat_system/controller/users_controller.dart';
 import 'package:chat_system/models/message_model.dart';
@@ -12,7 +13,7 @@ class ChatController extends GetxController {
   ChatController(this._chatRepo, this.userController);
 
   RxString currentChatId = ''.obs;
-  RxList messages = <MessageModel>[].obs;
+  RxList<MessageModel> messages = <MessageModel>[].obs;
 
   RxInt unreadCount = 0.obs;
   Rx<UserModel?> otherUser = Rx<UserModel?>(null);
@@ -22,6 +23,8 @@ class ChatController extends GetxController {
   void initChat(String chatId) {
     currentChatId.value = chatId;
     _listenMessages();
+
+    _chatRepo.markMessagesRead(chatId, _chatRepo.currentUserId);
   }
 
   void _listenMessages() {
@@ -42,24 +45,31 @@ class ChatController extends GetxController {
 
   /// Create or get chat and initialize messages
   Future<void> createOrGetChat({required UserModel otherUser}) async {
+    log('create or get chat called');
     final currentUser = userController.currentUser.value;
     if (currentUser == null) {
       print("Current user not loaded yet");
       return;
     }
 
-    final currentUserId = currentUser.uid;
+    final currentUserId = _chatRepo.currentUserId;
+
     this.otherUser.value = otherUser;
 
-    // Get or create chatId
-    currentChatId.value =
-        (await _chatRepo.getOrCreateChatId(currentUserId, otherUser.uid))!;
+    log(otherUser.uid);
 
-    // Cancel previous listener if exists
+    currentChatId.value = (await _chatRepo.getOrCreateChatId(
+      currentUserId,
+      otherUser.uid,
+    ));
+
+    log('create chat id');
+
     _messagesSub?.cancel();
 
     _messagesSub = _chatRepo.getMessages(currentChatId.value).listen((msgs) {
       messages.value = msgs;
+      log('get messages');
 
       // Update unread count
       unreadCount.value =
