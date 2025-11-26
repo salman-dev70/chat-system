@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:chat_system/controller/auth_controller.dart';
 import 'package:chat_system/models/message_model.dart';
+import 'package:chat_system/utils/widgets/timeformat.dart';
+import 'package:chat_system/utils/widgets/unread_badge_widget.dart';
 import 'package:chat_system/view/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -12,17 +15,49 @@ import '../models/chat_model.dart';
 import '../models/user_model.dart';
 import 'chat_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final AllChatsController allChatsController = Get.find<AllChatsController>();
+
   final UserController userController = Get.find<UserController>();
+
   final ChatController chatController = Get.find<ChatController>();
+
   final AuthController authController = Get.find<AuthController>();
+
+  Timer? _timer;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      allChatsController.initializeChats();
+    });
+
+    _timer = Timer.periodic(Duration(minutes: 1), (timer) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+    _timer?.cancel();
+  }
 
   @override
   Widget build(BuildContext context) {
     log(" Current User ID: ${userController.currentUserId}");
     log(" All Users Count: ${userController.allUsers.length}");
     log(" All Chats Count: ${allChatsController.allChats.length}");
+    log(" HomeScreen - All unreadCounts: ${allChatsController.unreadCounts}");
+
     return DefaultTabController(
       length: 2, // Chats & Users
       child: Scaffold(
@@ -51,6 +86,9 @@ class HomeScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   ChatModel chat = allChatsController.allChats[index];
 
+                  int? unreadCount = allChatsController.unreadCounts[chat.id];
+                  log("Chat ${chat.id} - Unread: $unreadCount");
+
                   // Find the other user's ID
                   String otherUserId = chat.users.firstWhere(
                     (uid) => uid != userController.currentUser.value?.uid,
@@ -59,6 +97,8 @@ class HomeScreen extends StatelessWidget {
                   // Get the other user's info
                   UserModel? otherUser = userController.allUsers
                       .firstWhereOrNull((user) => user.uid == otherUserId);
+                  MessageModel? lastMsg =
+                      allChatsController.lastMessages[chat.id];
 
                   return ListTile(
                     leading: Stack(
@@ -98,23 +138,33 @@ class HomeScreen extends StatelessWidget {
                       }
                       return Text(lastMsg.message);
                     }),
-                    trailing: Obx(() {
-                      int? count = allChatsController.unreadCounts[chat.id];
-
-                      if (count != null && count > 0) {
-                        return CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Colors.red,
-                          child: Text(
-                            '$count',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          TimeUtils.formatMessageTime(
+                            lastMsg?.timestamp ?? chat.lastMessageTime,
                           ),
-                        );
-                      } else {
-                        return SizedBox();
-                      }
-                    }),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+
+                        UnreadBadge(chatId: chat.id),
+                      ],
+                    ),
                     onTap: () {
+                      log(
+                        " BEFORE - Unread: ${allChatsController.unreadCounts[chat.id]}",
+                      );
+
+                      allChatsController.markChatAsOpen(chat.id);
+
+                      log(
+                        " AFTER - Unread: ${allChatsController.unreadCounts[chat.id]}",
+                      );
                       chatController.initChat(chat.id);
                       chatController.otherUser.value = otherUser;
 
@@ -178,6 +228,10 @@ class HomeScreen extends StatelessWidget {
                         await chatController.createOrGetChat(
                           otherUser: otherUser,
                         );
+                        String chatId = chatController.currentChatId.value;
+                        if (chatId.isNotEmpty) {
+                          allChatsController.markChatAsOpen(chatId);
+                        }
 
                         // Navigate to ChatScreen
                         Get.to(() => ChatScreen());
@@ -187,6 +241,10 @@ class HomeScreen extends StatelessWidget {
                       await chatController.createOrGetChat(
                         otherUser: otherUser,
                       );
+                      String chatId = chatController.currentChatId.value;
+                      if (chatId.isNotEmpty) {
+                        allChatsController.markChatAsOpen(chatId);
+                      }
 
                       log("Navigating to chat with: ${otherUser.name}");
                       Get.to(() => ChatScreen());
@@ -200,4 +258,27 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+
+  // Widget _buildTrailingColumn(
+  //   MessageModel? lastMsg,
+  //   int unreadCount,
+  //   String currentUserId,
+  // ) {
+  //   if (lastMsg == null) {
+  //     return SizedBox();
+  //   }
+
+  //   return Column(
+  //     mainAxisAlignment: MainAxisAlignment.center,
+  //     crossAxisAlignment: CrossAxisAlignment.end,
+  //     children: [
+  //       Text(
+  //         TimeUtils.formatMessageTime(lastMsg.timestamp),
+  //         style: TextStyle(color: Colors.grey[600], fontSize: 12),
+  //       ),
+
+  //       UnreadBadge(chatId: )
+  //     ],
+  //   );
+  // }
 }

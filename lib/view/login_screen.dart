@@ -30,6 +30,7 @@ class LoginScreen extends StatelessWidget {
               ),
               onPressed: () async {
                 await _authController.signInWithGoogle();
+                allChatsController.resetForNewUser();
 
                 log("fetch chats after login");
                 await userController.loadCurrentUserData();

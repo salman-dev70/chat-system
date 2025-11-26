@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:chat_system/bindings/app_binding.dart';
 import 'package:chat_system/controller/all_chats_controller.dart';
 import 'package:chat_system/controller/users_controller.dart';
@@ -6,6 +8,7 @@ import 'package:chat_system/repository/auth_repo.dart';
 import 'package:chat_system/view/login_screen.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AuthController extends GetxController with WidgetsBindingObserver {
   final AuthRepo _authRepo;
@@ -88,10 +91,26 @@ class AuthController extends GetxController with WidgetsBindingObserver {
 
       currentUser.value = null;
       userController.clearUserData();
+      await _clearAppCache();
 
       Get.offAll(() => LoginScreen());
     } catch (e) {
       Get.snackbar("Sign Out failed", e.toString());
+      print(e.toString());
+    }
+  }
+
+  Future<void> _clearAppCache() async {
+    try {
+      Directory tempDir = await getTemporaryDirectory();
+      if (tempDir.existsSync()) {
+        // Delete the entire directory recursively
+        await tempDir.delete(recursive: true);
+        // Recreate it to avoid potential errors if other processes need it immediately
+        await Directory(tempDir.path).create(recursive: true);
+      }
+    } catch (e) {
+      print("Error clearing temporary app cache: $e");
     }
   }
 }

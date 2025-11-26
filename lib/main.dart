@@ -30,7 +30,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Ab user status check karein (data pehle hi loaded hai)
     final userController = Get.find<UserController>();
 
     return GetMaterialApp(

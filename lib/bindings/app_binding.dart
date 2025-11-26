@@ -14,10 +14,7 @@ class AppBindings extends Bindings {
   @override
   void dependencies() {
     // Services
-    Get.put<AuthService>(
-      AuthService(),
-      permanent: true,
-    ); // Permanent: true for Auth
+    Get.put<AuthService>(AuthService(), permanent: true);
     Get.put<ChatService>(ChatService(), permanent: true);
 
     // Repositories
@@ -36,7 +33,6 @@ class AppBindings extends Bindings {
     Get.put<AllChatsController>(AllChatsController(Get.find<ChatRepo>()));
   }
 
-  // >>> Yeh extra function data load karne ke liye <<<
   static Future<void> loadInitialData() async {
     final AuthService authService = Get.find<AuthService>();
     final UserController userController = Get.find<UserController>();

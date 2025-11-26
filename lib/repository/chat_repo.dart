@@ -43,9 +43,11 @@ class ChatRepo {
 
   // get messages stream
   Stream<List<MessageModel>> getMessages(String chatId) {
+    log(" ChatRepo.getMessages called for: $chatId");
     try {
       return _chatService.getMessages(chatId);
     } catch (e) {
+      log(" Error in ChatRepo.getMessages: $e");
       throw Exception('Failed to get messages: $e');
     }
   }
@@ -70,5 +72,13 @@ class ChatRepo {
 
   Future<void> markMessagesRead(String chatId, String userId) {
     return _chatService.markMessagesRead(chatId, userId);
+  }
+
+  Future<void> markAllMessagesAsRead(String chatId, String userId) async {
+    try {
+      await _chatService.markAllMessagesAsRead(chatId, userId);
+    } catch (e) {
+      throw Exception('Failed to mark all messages as read: $e');
+    }
   }
 }

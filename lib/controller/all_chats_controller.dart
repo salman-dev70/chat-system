@@ -17,6 +17,7 @@ class AllChatsController extends GetxController {
 
   // Map to track unread messages count per chat
   RxMap<String, int> unreadCounts = <String, int>{}.obs;
+  final RxSet<String> _openChats = <String>{}.obs;
 
   ///
   final Map<String, StreamSubscription> _messageSubscriptions = {};
@@ -33,7 +34,7 @@ class AllChatsController extends GetxController {
   }
 
   void initializeChats() {
-    if (hasInitialized.value) return; // Already initialized
+    if (hasInitialized.value) return;
 
     if (_chatRepo.currentUserId.isEmpty) {
       log(" User ID not available for chats initialization");
@@ -42,6 +43,25 @@ class AllChatsController extends GetxController {
 
     hasInitialized.value = true;
     listenAllUserChats();
+  }
+
+  void markChatAsOpen(String chatId) {
+    _openChats.add(chatId);
+    unreadCounts[chatId] = 0;
+    update();
+    log(" Chat $chatId marked as open - Unread count reset to 0");
+  }
+
+  void markChatAsClosed(String chatId) {
+    _openChats.remove(chatId);
+
+    unreadCounts[chatId] = 0;
+    update();
+    log(" Chat $chatId marked as closed - Unread count: 0");
+  }
+
+  int getUnreadCount(String chatId) {
+    return unreadCounts[chatId] ?? 0;
   }
 
   void listenAllUserChats() {
@@ -56,22 +76,43 @@ class AllChatsController extends GetxController {
             isLoading.value = false;
             log(" Chats loaded: ${chats.length} chats found");
 
-            // Ensure we only subscribe to new chats
-            for (var chat in chats) {
-              if (!_messageSubscriptions.containsKey(chat.id)) {
-                _listenChatMessages(chat.id);
-              }
+            //  CHECK: If chats list is empty
+            if (chats.isEmpty) {
+              log(" NO CHATS FOUND - Cannot start message listeners");
+              return;
             }
 
-            // Unsubscribe from chats that were deleted
-            List<String> currentChatIds = chats.map((c) => c.id).toList();
-            _messageSubscriptions.keys.toList().forEach((chatId) {
-              if (!currentChatIds.contains(chatId)) {
-                _messageSubscriptions[chatId]?.cancel();
-                _messageSubscriptions.remove(chatId);
-                lastMessages.remove(chatId);
-                unreadCounts.remove(chatId);
-              }
+            //  DEBUG: Show each chat
+            for (int i = 0; i < chats.length; i++) {
+              log(" Chat $i: ${chats[i].id} | Users: ${chats[i].users}");
+            }
+
+            //  FORCE RESTART ALL MESSAGE LISTENERS
+            log(" FORCE RESTARTING all message listeners");
+
+            // Cancel all existing subscriptions
+            _messageSubscriptions.forEach((chatId, subscription) {
+              subscription.cancel();
+              log(" Cancelled existing subscription for: $chatId");
+            });
+            _messageSubscriptions.clear();
+
+            // Start fresh listeners for all chats
+            int listenersStarted = 0;
+            for (var chat in chats) {
+              log(" STARTING message listener for: ${chat.id}");
+              _listenChatMessages(chat.id);
+              listenersStarted++;
+            }
+
+            log(" Total message listeners started: $listenersStarted");
+
+            // Check after delay
+            Future.delayed(Duration(seconds: 3), () {
+              log(
+                " After 3 seconds - Active subscriptions: ${_messageSubscriptions.length}",
+              );
+              log(" UnreadCounts: $unreadCounts");
             });
           },
           onError: (error) {
@@ -80,27 +121,132 @@ class AllChatsController extends GetxController {
           },
         );
   }
+  // void listenAllUserChats() {
+  //   log(" Loading all user chats: ${_chatRepo.currentUserId}");
+  //   isLoading.value = true;
+
+  //   _chatRepo
+  //       .getUserChats(_chatRepo.currentUserId)
+  //       .listen(
+  //         (chats) {
+  //           allChats.value = chats;
+  //           isLoading.value = false;
+  //           log(" Chats loaded: ${chats.length} chats found");
+
+  //           // Ensure we only subscribe to new chats
+  //           for (var chat in chats) {
+  //             bool alreadySubscribed = _messageSubscriptions.containsKey(
+  //               chat.id,
+  //             );
+  //             log(
+  //               "🔍 Chat: ${chat.id} | Already subscribed: $alreadySubscribed",
+  //             );
+
+  //             if (!alreadySubscribed) {
+  //               log(" STARTING message listener for: ${chat.id}");
+  //               _listenChatMessages(chat.id);
+  //             } else {
+  //               log(" Already listening to: ${chat.id}");
+  //             }
+  //           }
+
+  //           // Unsubscribe from chats that were deleted
+  //           List<String> currentChatIds = chats.map((c) => c.id).toList();
+  //           _messageSubscriptions.keys.toList().forEach((chatId) {
+  //             if (!currentChatIds.contains(chatId)) {
+  //               _messageSubscriptions[chatId]?.cancel();
+  //               _messageSubscriptions.remove(chatId);
+  //               lastMessages.remove(chatId);
+  //               unreadCounts.remove(chatId);
+  //             }
+  //           });
+  //         },
+  //         onError: (error) {
+  //           isLoading.value = false;
+  //           log(" Error loading chats: $error");
+  //         },
+  //       );
+  // }
 
   /// Listen messages for a specific chat to get last message & unread count
+  //
   void _listenChatMessages(String chatId) {
-    _messageSubscriptions[chatId] = _chatRepo.getMessages(chatId).listen((
-      messages,
-    ) {
-      if (messages.isNotEmpty) {
-        lastMessages[chatId] = messages.first;
-        unreadCounts[chatId] =
-            messages
-                .where(
-                  (msg) =>
-                      !msg.isRead && msg.senderId != _chatRepo.currentUserId,
-                )
-                .length;
-        log("Updated unread count for $chatId: ${unreadCounts[chatId]}");
-      } else {
-        lastMessages[chatId] = null;
-        unreadCounts[chatId] = 0;
-      }
+    log(" _listenChatMessages ENTERED for: $chatId");
+
+    try {
+      log(" Calling _chatRepo.getMessages($chatId)");
+
+      _messageSubscriptions[chatId] = _chatRepo
+          .getMessages(chatId)
+          .listen(
+            (messages) {
+              log(
+                " MESSAGES RECEIVED for $chatId: ${messages.length} messages",
+              );
+
+              Future.microtask(() {
+                if (_openChats.contains(chatId)) {
+                  log(" Chat $chatId OPEN - Unread: 0");
+                  lastMessages[chatId] =
+                      messages.isNotEmpty ? messages.first : null;
+                  unreadCounts[chatId] = 0;
+                  return;
+                }
+
+                if (messages.isNotEmpty) {
+                  lastMessages[chatId] = messages.first;
+                  int currentUnread = unreadCounts[chatId] ?? 0;
+                  int actualUnread =
+                      messages
+                          .where(
+                            (msg) =>
+                                !msg.isRead &&
+                                msg.senderId != _chatRepo.currentUserId,
+                          )
+                          .length;
+                  if (actualUnread > currentUnread) {
+                    unreadCounts[chatId] = actualUnread;
+                    log(" New message - Unread: $actualUnread");
+                  }
+                } else {
+                  lastMessages[chatId] = null;
+                  unreadCounts[chatId] = 0;
+                  log(" No messages for $chatId");
+                }
+              });
+            },
+            onError: (error) {
+              log(" STREAM ERROR for $chatId: $error");
+            },
+            cancelOnError: false,
+          );
+
+      log(" Subscription CREATED for $chatId");
+    } catch (e) {
+      log(" EXCEPTION in _listenChatMessages: $e");
+    }
+  }
+
+  void resetForNewUser() {
+    log(" RESETTING AllChatsController for new user");
+
+    // Cancel all subscriptions
+    _messageSubscriptions.forEach((chatId, subscription) {
+      subscription.cancel();
     });
+    _messageSubscriptions.clear();
+
+    // Clear all data
+    allChats.clear();
+    lastMessages.clear();
+    unreadCounts.clear();
+    _openChats.clear();
+
+    // Reset flags
+    isLoading.value = false;
+    hasInitialized.value = false;
+
+    log(" AllChatsController reset complete");
   }
 
   @override

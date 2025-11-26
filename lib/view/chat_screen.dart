@@ -1,15 +1,53 @@
+import 'dart:math';
+
+import 'package:chat_system/controller/all_chats_controller.dart';
 import 'package:chat_system/controller/users_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:chat_system/controller/chat_controller.dart';
 import 'package:chat_system/models/message_model.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends StatefulWidget {
+  ChatScreen({super.key});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
   final ChatController chatController = Get.find<ChatController>();
+  final AllChatsController allChatsController = Get.find<AllChatsController>();
   final UserController userController = Get.find<UserController>();
+
   final TextEditingController messageController = TextEditingController();
 
-  ChatScreen({super.key});
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _markChatAsOpen();
+    });
+  }
+
+  void _markChatAsOpen() {
+    String chatId = chatController.currentChatId.value;
+    if (chatId.isNotEmpty) {
+      allChatsController.markChatAsOpen(chatId);
+      print(" ChatScreen - Chat marked as OPEN: $chatId");
+    }
+  }
+
+  @override
+  void dispose() {
+    Future.delayed(Duration(milliseconds: 100), () {
+      String currentChatId = chatController.currentChatId.value;
+      if (currentChatId.isNotEmpty) {
+        allChatsController.markChatAsClosed(currentChatId);
+      }
+    });
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

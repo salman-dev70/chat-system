@@ -119,4 +119,32 @@ class ChatService {
       await doc.reference.update({'isRead': true});
     }
   }
+
+  Future<void> markAllMessagesAsRead(String chatId, String userId) async {
+    try {
+      // Get all unread messages from other users
+      final querySnapshot =
+          await _firestore
+              .collection('chats')
+              .doc(chatId)
+              .collection('messages')
+              .where('isRead', isEqualTo: false)
+              .where('senderId', isNotEqualTo: userId)
+              .get();
+
+      // Batch update all to read
+      final batch = _firestore.batch();
+      for (final doc in querySnapshot.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+
+      await batch.commit();
+      print(
+        " Marked ${querySnapshot.docs.length} messages as read in Firestore",
+      );
+    } catch (e) {
+      print(" Error in markAllMessagesAsRead: $e");
+      throw e;
+    }
+  }
 }

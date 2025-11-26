@@ -23,7 +23,7 @@ class ChatController extends GetxController {
   void initChat(String chatId) {
     currentChatId.value = chatId;
     _listenMessages();
-
+    markAllMessagesAsRead(chatId);
     _chatRepo.markMessagesRead(chatId, _chatRepo.currentUserId);
   }
 
@@ -76,7 +76,7 @@ class ChatController extends GetxController {
           msgs
               .where((msg) => !msg.isRead && msg.senderId != currentUserId)
               .length;
-
+      markAllMessagesAsRead(currentChatId.value);
       // Reset unread count in DB
       _chatRepo.resetUnreadCount(currentChatId.value, currentUserId);
     });
@@ -106,6 +106,15 @@ class ChatController extends GetxController {
       _chatRepo.currentUserId,
     );
     unreadCount.value = 0;
+  }
+
+  Future<void> markAllMessagesAsRead(String chatId) async {
+    try {
+      await _chatRepo.markAllMessagesAsRead(chatId, _chatRepo.currentUserId);
+      log(" All messages marked as READ in Firestore for chat: $chatId");
+    } catch (e) {
+      log(" Error marking all messages as read: $e");
+    }
   }
 
   @override
