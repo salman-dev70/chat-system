@@ -25,6 +25,7 @@ class AllChatsController extends GetxController {
   // Track loading state
   RxBool isLoading = false.obs;
   RxBool hasInitialized = false.obs;
+  RxList<ChatModel> activeChats = <ChatModel>[].obs;
 
   AllChatsController(this._chatRepo);
 
@@ -76,13 +77,12 @@ class AllChatsController extends GetxController {
             isLoading.value = false;
             log(" Chats loaded: ${chats.length} chats found");
 
-            //  CHECK: If chats list is empty
             if (chats.isEmpty) {
               log(" NO CHATS FOUND - Cannot start message listeners");
               return;
             }
 
-            //  DEBUG: Show each chat
+            //   Show each chat
             for (int i = 0; i < chats.length; i++) {
               log(" Chat $i: ${chats[i].id} | Users: ${chats[i].users}");
             }
@@ -121,55 +121,9 @@ class AllChatsController extends GetxController {
           },
         );
   }
-  // void listenAllUserChats() {
-  //   log(" Loading all user chats: ${_chatRepo.currentUserId}");
-  //   isLoading.value = true;
-
-  //   _chatRepo
-  //       .getUserChats(_chatRepo.currentUserId)
-  //       .listen(
-  //         (chats) {
-  //           allChats.value = chats;
-  //           isLoading.value = false;
-  //           log(" Chats loaded: ${chats.length} chats found");
-
-  //           // Ensure we only subscribe to new chats
-  //           for (var chat in chats) {
-  //             bool alreadySubscribed = _messageSubscriptions.containsKey(
-  //               chat.id,
-  //             );
-  //             log(
-  //               "🔍 Chat: ${chat.id} | Already subscribed: $alreadySubscribed",
-  //             );
-
-  //             if (!alreadySubscribed) {
-  //               log(" STARTING message listener for: ${chat.id}");
-  //               _listenChatMessages(chat.id);
-  //             } else {
-  //               log(" Already listening to: ${chat.id}");
-  //             }
-  //           }
-
-  //           // Unsubscribe from chats that were deleted
-  //           List<String> currentChatIds = chats.map((c) => c.id).toList();
-  //           _messageSubscriptions.keys.toList().forEach((chatId) {
-  //             if (!currentChatIds.contains(chatId)) {
-  //               _messageSubscriptions[chatId]?.cancel();
-  //               _messageSubscriptions.remove(chatId);
-  //               lastMessages.remove(chatId);
-  //               unreadCounts.remove(chatId);
-  //             }
-  //           });
-  //         },
-  //         onError: (error) {
-  //           isLoading.value = false;
-  //           log(" Error loading chats: $error");
-  //         },
-  //       );
-  // }
 
   /// Listen messages for a specific chat to get last message & unread count
-  //
+
   void _listenChatMessages(String chatId) {
     log(" _listenChatMessages ENTERED for: $chatId");
 

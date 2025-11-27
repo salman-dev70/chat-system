@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:developer';
+
 import 'package:chat_system/models/chat_model.dart';
 import 'package:chat_system/models/message_model.dart';
 import 'package:chat_system/service/auth_service.dart';
@@ -146,5 +149,65 @@ class ChatService {
       print(" Error in markAllMessagesAsRead: $e");
       throw e;
     }
+  }
+
+  // Delete chat for specific User
+  Future<void> deletedChatForUser(String chatID, String userId) async {
+    await _firestore.collection('chats').doc(chatID).update({
+      'deletedForUsers': FieldValue.arrayUnion([userId]),
+    });
+    log('chat delete for current user');
+  }
+
+  // Get only active chats
+  Stream<List<ChatModel>> getOnlyActiveChats(String userID) {
+    return _firestore
+        .collection('chats')
+        .where('users', arrayContains: userID)
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => ChatModel.fromMap(doc.data(), doc.id))
+                  .where((chat) => !chat.isDeletedForUser(userID))
+                  .toList(),
+        );
+  }
+
+  // check if any any chat exist between users(even deleted )
+  Future<String?> getAnyChatsBetweenUsers(String user1, String user2) async {
+    final snapshot =
+        await _firestore
+            .collection('chats')
+            .where('users', arrayContainsAny: [user1, user2])
+            .get();
+
+    for (final doc in snapshot.docs) {
+      final chat = ChatModel.fromMap(doc.data(), doc.id);
+      if (chat.users.contains(user1) && chat.users.contains(user2)) {
+        return chat.id;
+      }
+    }
+    return null;
+  }
+
+  // create new caht with unique ID
+  Future<String?> createNewChat(String userID, String otherUserId) async {
+    List<String> uids = [userID, otherUserId];
+    uids.sort();
+
+    //unique chat id with new  timeStamp
+    String chatID =
+        '${uids.join('_')}_${DateTime.now().millisecondsSinceEpoch}';
+    final chatRef = _firestore.collection('chats').doc(chatID);
+
+    await chatRef.set({
+      'users': [userID, otherUserId],
+      'lastMessage': '',
+      'lastMessageTime': Timestamp.now(),
+      'deletedForUsers': [],
+    });
+    return chatID;
   }
 }

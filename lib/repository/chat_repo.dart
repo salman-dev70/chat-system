@@ -81,4 +81,45 @@ class ChatRepo {
       throw Exception('Failed to mark all messages as read: $e');
     }
   }
+
+  //delete chat for user
+  Future<void> deletedChatForUser(String chatID, String userId) async {
+    try {
+      await _chatService.deletedChatForUser(chatID, userId);
+    } catch (e) {
+      throw Exception('Failed to delete chat for user: $e');
+    }
+  }
+
+  // get only acrive chats
+  Stream<List<ChatModel>> getOnlyActiveChats(String userID) {
+    try {
+      return _chatService.getOnlyActiveChats(userID);
+    } catch (e) {
+      throw Exception('Failed to get only active chats: $e');
+    }
+  }
+  // get any chats between users
+
+  Future<String?> getAnyChatsBetweenUsers(
+    String userId,
+    String otherUserId,
+  ) async {
+    try {
+      return await _chatService.getAnyChatsBetweenUsers(userId, otherUserId);
+    } catch (e) {
+      throw Exception('Failed to get any chats between users: $e');
+    }
+  }
+  // create new chat between users
+
+  Future<String?> createNewChat(String userID, String otherUserId) async {
+    try {
+      log('Creating new chat for $userID and $otherUserId');
+      return await _chatService.createNewChat(userID, otherUserId);
+    } catch (e) {
+      log('Error in createNewChat: $e', level: 1000);
+      throw Exception('Failed to create new chat: $e');
+    }
+  }
 }

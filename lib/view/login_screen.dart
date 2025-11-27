@@ -1,9 +1,9 @@
 import 'dart:developer';
 
 import 'package:chat_system/controller/all_chats_controller.dart';
-import 'package:chat_system/controller/chat_controller.dart';
+
 import 'package:chat_system/controller/users_controller.dart';
-import 'package:chat_system/models/chat_model.dart';
+
 import 'package:chat_system/view/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

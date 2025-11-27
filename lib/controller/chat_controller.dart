@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer';
 
 import 'package:chat_system/controller/users_controller.dart';
+import 'package:chat_system/models/chat_model.dart';
 import 'package:chat_system/models/message_model.dart';
 import 'package:chat_system/models/user_model.dart';
 import 'package:chat_system/repository/chat_repo.dart';
@@ -18,6 +19,8 @@ class ChatController extends GetxController {
   RxInt unreadCount = 0.obs;
   Rx<UserModel?> otherUser = Rx<UserModel?>(null);
   StreamSubscription? _messagesSub;
+
+  RxList<ChatModel> activeChats = <ChatModel>[].obs;
 
   // initiaize chat with slected chat Id
   void initChat(String chatId) {
@@ -115,6 +118,35 @@ class ChatController extends GetxController {
     } catch (e) {
       log(" Error marking all messages as read: $e");
     }
+  }
+
+  //delete chat for current user
+  Future<void> deletedChatForUser(String chatID) async {
+    try {
+      await _chatRepo.deletedChatForUser(chatID, _chatRepo.currentUserId);
+
+      log(" Chat deleted for current user: $chatID");
+    } catch (e) {
+      log(" Error deleting chat for user: $e");
+    }
+  }
+
+  // get activechat between user
+  Stream<List<ChatModel>> getActiveChatStream() {
+    final currentUserId = _chatRepo.currentUserId;
+    return _chatRepo.getOnlyActiveChats(currentUserId);
+  }
+
+  // check if any chat exist between user
+  Future<String?> checkExistingChat(String otherUserId) async {
+    final currentUserId = _chatRepo.currentUserId;
+    return await _chatRepo.getAnyChatsBetweenUsers(currentUserId, otherUserId);
+  }
+
+  //create fresh new chat between users
+  Future<String?> createFreshChat(String otherUserId) async {
+    final currentUserId = _chatRepo.currentUserId;
+    return await _chatRepo.createNewChat(currentUserId, otherUserId);
   }
 
   @override

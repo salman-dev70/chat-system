@@ -8,6 +8,7 @@ class ChatModel {
   final DateTime lastMessageTime;
   final Map<String, int> unreadCount;
   UserModel? otherUser;
+  final List<String> deletedForUsers;
 
   ChatModel({
     required this.id,
@@ -15,6 +16,7 @@ class ChatModel {
     required this.lastMessage,
     required this.lastMessageTime,
     required this.unreadCount,
+    this.deletedForUsers = const [],
   });
 
   factory ChatModel.fromMap(Map<String, dynamic> map, String id) => ChatModel(
@@ -26,6 +28,7 @@ class ChatModel {
             ? (map['lastMessageTime'] as Timestamp).toDate()
             : DateTime.now(),
     unreadCount: Map<String, int>.from(map['unreadCount'] ?? {}),
+    deletedForUsers: List<String>.from(map['deletedForUsers'] ?? []),
   );
 
   Map<String, dynamic> toMap() => {
@@ -33,5 +36,22 @@ class ChatModel {
     'lastMessage': lastMessage,
     'lastMessageTime': lastMessageTime,
     'unreadCount': unreadCount,
+    'deletedForUsers': deletedForUsers,
   };
+
+  bool isDeletedForUser(String userId) {
+    return deletedForUsers.contains(userId);
+  }
+
+  String getOtherUserId(String currentUserId) {
+    try {
+      return users.firstWhere((uid) => uid != currentUserId);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  int getUnreadCountForUser(String userId) {
+    return unreadCount[userId] ?? 0;
+  }
 }

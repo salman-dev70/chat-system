@@ -8,7 +8,6 @@ class TimeUtils {
     if (difference.inHours < 24) return '${difference.inHours}h';
     if (difference.inDays < 7) return '${difference.inDays}d';
 
-    // Agar 7 din se zyada purana hai to date dikhao
     return '${timestamp.day}/${timestamp.month}';
   }
 }

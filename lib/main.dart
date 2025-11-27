@@ -1,12 +1,7 @@
 import 'package:chat_system/bindings/app_binding.dart';
-import 'package:chat_system/controller/all_chats_controller.dart';
-import 'package:chat_system/controller/auth_controller.dart';
-import 'package:chat_system/controller/chat_controller.dart';
+
 import 'package:chat_system/controller/users_controller.dart';
-import 'package:chat_system/repository/auth_repo.dart';
-import 'package:chat_system/repository/chat_repo.dart';
-import 'package:chat_system/service/auth_service.dart';
-import 'package:chat_system/service/chat_service.dart';
+
 import 'package:chat_system/view/home_screen.dart';
 import 'package:chat_system/view/login_screen.dart';
 import 'package:firebase_core/firebase_core.dart';

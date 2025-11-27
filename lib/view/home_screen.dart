@@ -5,7 +5,7 @@ import 'package:chat_system/controller/auth_controller.dart';
 import 'package:chat_system/models/message_model.dart';
 import 'package:chat_system/utils/widgets/timeformat.dart';
 import 'package:chat_system/utils/widgets/unread_badge_widget.dart';
-import 'package:chat_system/view/login_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controller/all_chats_controller.dart';
@@ -100,80 +100,101 @@ class _HomeScreenState extends State<HomeScreen> {
                   MessageModel? lastMsg =
                       allChatsController.lastMessages[chat.id];
 
-                  return ListTile(
-                    leading: Stack(
-                      children: [
-                        CircleAvatar(
-                          backgroundImage: NetworkImage(otherUser?.image ?? ''),
-                        ),
-                        // Online Indicator
-                        if (otherUser != null)
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color:
-                                    otherUser.isOnline
-                                        ? Colors.green
-                                        : Colors.grey,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
+                  return Dismissible(
+                    key: Key(chat.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerRight,
+                      padding: EdgeInsets.only(right: 20),
+                      child: Icon(Icons.delete, color: Colors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await _showDeleteConfirmation(
+                        chat.id,
+                        otherUser?.name ?? 'User',
+                      );
+                    },
+                    onDismissed: (direction) {
+                      chatController.deletedChatForUser(chat.id);
+                    },
+                    child: ListTile(
+                      leading: Stack(
+                        children: [
+                          CircleAvatar(
+                            backgroundImage: NetworkImage(
+                              otherUser?.image ?? '',
+                            ),
+                          ),
+                          // Online Indicator
+                          if (otherUser != null)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color:
+                                      otherUser.isOnline
+                                          ? Colors.green
+                                          : Colors.grey,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
                                 ),
                               ),
                             ),
+                        ],
+                      ),
+                      title: Text(otherUser?.name ?? 'Unknown'),
+                      subtitle: Obx(() {
+                        MessageModel? lastMsg =
+                            allChatsController.lastMessages[chat.id];
+                        if (lastMsg == null) {
+                          return Text(chat.lastMessage);
+                        }
+                        return Text(lastMsg.message);
+                      }),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            TimeUtils.formatMessageTime(
+                              lastMsg?.timestamp ?? chat.lastMessageTime,
+                            ),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
                           ),
-                      ],
+
+                          UnreadBadge(chatId: chat.id),
+                        ],
+                      ),
+                      onTap: () {
+                        log(
+                          " BEFORE - Unread: ${allChatsController.unreadCounts[chat.id]}",
+                        );
+
+                        allChatsController.markChatAsOpen(chat.id);
+
+                        log(
+                          " AFTER - Unread: ${allChatsController.unreadCounts[chat.id]}",
+                        );
+                        chatController.initChat(chat.id);
+                        chatController.otherUser.value = otherUser;
+
+                        if (chatController.otherUser.value != null) {
+                          Get.to(() => ChatScreen());
+                        } else {
+                          Get.snackbar("Error", "Other user not loaded yet");
+                        }
+                      },
                     ),
-                    title: Text(otherUser?.name ?? 'Unknown'),
-                    subtitle: Obx(() {
-                      MessageModel? lastMsg =
-                          allChatsController.lastMessages[chat.id];
-                      if (lastMsg == null) {
-                        return Text(chat.lastMessage);
-                      }
-                      return Text(lastMsg.message);
-                    }),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          TimeUtils.formatMessageTime(
-                            lastMsg?.timestamp ?? chat.lastMessageTime,
-                          ),
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-
-                        UnreadBadge(chatId: chat.id),
-                      ],
-                    ),
-                    onTap: () {
-                      log(
-                        " BEFORE - Unread: ${allChatsController.unreadCounts[chat.id]}",
-                      );
-
-                      allChatsController.markChatAsOpen(chat.id);
-
-                      log(
-                        " AFTER - Unread: ${allChatsController.unreadCounts[chat.id]}",
-                      );
-                      chatController.initChat(chat.id);
-                      chatController.otherUser.value = otherUser;
-
-                      if (chatController.otherUser.value != null) {
-                        Get.to(() => ChatScreen());
-                      } else {
-                        Get.snackbar("Error", "Other user not loaded yet");
-                      }
-                    },
                   );
                 },
               );
@@ -259,26 +280,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Widget _buildTrailingColumn(
-  //   MessageModel? lastMsg,
-  //   int unreadCount,
-  //   String currentUserId,
-  // ) {
-  //   if (lastMsg == null) {
-  //     return SizedBox();
-  //   }
+  // Delete Confirmation Dialog
+  Future<bool> _showDeleteConfirmation(String chatId, String userName) async {
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: Text('Delete Chat?'),
+        content: Text(
+          'This chat will be deleted from your account. $userName will still see the chat.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
 
-  //   return Column(
-  //     mainAxisAlignment: MainAxisAlignment.center,
-  //     crossAxisAlignment: CrossAxisAlignment.end,
-  //     children: [
-  //       Text(
-  //         TimeUtils.formatMessageTime(lastMsg.timestamp),
-  //         style: TextStyle(color: Colors.grey[600], fontSize: 12),
-  //       ),
-
-  //       UnreadBadge(chatId: )
-  //     ],
-  //   );
-  // }
+    if (result == true) {
+      chatController.deletedChatForUser(chatId);
+      Get.snackbar('Success', 'Chat deleted successfully');
+      return true;
+    }
+    return false;
+  }
 }
