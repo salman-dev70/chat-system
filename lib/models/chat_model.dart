@@ -9,6 +9,7 @@ class ChatModel {
   final Map<String, int> unreadCount;
   UserModel? otherUser;
   final List<String> deletedForUsers;
+  final Map<String, dynamic> deletedTimeStamp;
 
   ChatModel({
     required this.id,
@@ -17,6 +18,7 @@ class ChatModel {
     required this.lastMessageTime,
     required this.unreadCount,
     this.deletedForUsers = const [],
+    this.deletedTimeStamp = const {},
   });
 
   factory ChatModel.fromMap(Map<String, dynamic> map, String id) => ChatModel(
@@ -29,6 +31,7 @@ class ChatModel {
             : DateTime.now(),
     unreadCount: Map<String, int>.from(map['unreadCount'] ?? {}),
     deletedForUsers: List<String>.from(map['deletedForUsers'] ?? []),
+    deletedTimeStamp: Map<String, dynamic>.from(map['deletedTimeStamp'] ?? {}),
   );
 
   Map<String, dynamic> toMap() => {
@@ -37,21 +40,33 @@ class ChatModel {
     'lastMessageTime': lastMessageTime,
     'unreadCount': unreadCount,
     'deletedForUsers': deletedForUsers,
+    'deletedTimeStamp': deletedTimeStamp,
   };
 
   bool isDeletedForUser(String userId) {
     return deletedForUsers.contains(userId);
   }
 
-  String getOtherUserId(String currentUserId) {
-    try {
-      return users.firstWhere((uid) => uid != currentUserId);
-    } catch (e) {
-      return '';
+  // get deletedTime for User
+
+  DateTime? getDeleteTimeForUser(String userId) {
+    if (deletedTimeStamp.containsKey(userId)) {
+      final timestamp = deletedTimeStamp[userId];
+      if (timestamp is Timestamp) {
+        return timestamp.toDate();
+      }
     }
+    return null;
   }
 
-  int getUnreadCountForUser(String userId) {
-    return unreadCount[userId] ?? 0;
+  // Check time for Home screen
+
+  bool shouldShowOnHomeScreen(String userId) {
+    if (!isDeletedForUser(userId)) return true;
+
+    final deleteTime = getDeleteTimeForUser(userId);
+    if (deleteTime == null) return false;
+
+    return lastMessageTime.isAfter(deleteTime);
   }
 }

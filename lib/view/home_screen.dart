@@ -78,6 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // --------- Chats Tab ---------
             Obx(() {
+              if (allChatsController.isLoading.value) {
+                return Center(child: CircularProgressIndicator());
+              }
               if (allChatsController.allChats.isEmpty) {
                 return Center(child: Text('No chats yet'));
               }
@@ -285,9 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await Get.dialog<bool>(
       AlertDialog(
         title: Text('Delete Chat?'),
-        content: Text(
-          'This chat will be deleted from your account. $userName will still see the chat.',
-        ),
+        content: Text('This chat will be deleted from your account.'),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),

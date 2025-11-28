@@ -42,10 +42,10 @@ class ChatRepo {
   }
 
   // get messages stream
-  Stream<List<MessageModel>> getMessages(String chatId) {
+  Stream<List<MessageModel>> getMessages(String chatId, String userId) {
     log(" ChatRepo.getMessages called for: $chatId");
     try {
-      return _chatService.getMessages(chatId);
+      return _chatService.getMessages(chatId, userId);
     } catch (e) {
       log(" Error in ChatRepo.getMessages: $e");
       throw Exception('Failed to get messages: $e');

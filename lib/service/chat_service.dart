@@ -29,6 +29,8 @@ class ChatService {
         'lastMessage': '',
         'lastMessageTime': Timestamp.now(),
         'unreadCount': {userId: 0, otherUserId: 0},
+        'deletedForUsers': [],
+        'deletedTimeStamp': {},
       });
     }
 
@@ -36,7 +38,6 @@ class ChatService {
   }
 
   // Send message
-
   Future<void> sendMessage({
     required String chatId,
     required String senderId,
@@ -48,7 +49,7 @@ class ChatService {
 
     final Timestamp timestamp = Timestamp.now();
 
-    //Add messsage
+    // Add message
     await messageRef.set({
       'senderId': senderId,
       'receiverId': receiverId,
@@ -57,29 +58,73 @@ class ChatService {
       'isRead': false,
     });
 
-    // update chat last mesasge and read count
+    // Update chat last message and read count
     final chatDoc = _firestore.collection('chats').doc(chatId);
-    await chatDoc.update({
+
+    //  Check if receiver has deleted this chat
+    final chatSnapshot = await chatDoc.get();
+    final chatData = chatSnapshot.data();
+
+    Map<String, dynamic> updateData = {
       'lastMessage': message,
       'lastMessageTime': timestamp,
       'unreadCount.$receiverId': FieldValue.increment(1),
-    });
+    };
+
+    // If receiver had deleted the chat, restore it by removing them from deletedForUsers
+    if (chatData != null) {
+      List<String> deletedForUsers = List<String>.from(
+        chatData['deletedForUsers'] ?? [],
+      );
+      if (deletedForUsers.contains(receiverId)) {
+        // Remove receiver from deletedForUsers to restore chat
+        updateData['deletedForUsers'] = FieldValue.arrayRemove([receiverId]);
+
+        updateData['deletedTimeStamp.$receiverId'] = timestamp;
+        log(' Chat restored for receiver: $receiverId');
+      }
+    }
+
+    await chatDoc.update(updateData);
   }
   // get Chat message through Stream
 
-  Stream<List<MessageModel>> getMessages(String chatId) {
-    return _firestore
-        .collection('chats')
-        .doc(chatId)
-        .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs
-                  .map((doc) => MessageModel.fromMap(doc.data(), doc.id))
-                  .toList(),
-        );
+  Stream<List<MessageModel>> getMessages(String chatId, String userId) {
+    return _firestore.collection('chats').doc(chatId).snapshots().asyncExpand((
+      chatDoc,
+    ) {
+      final chatData = chatDoc.data();
+      DateTime? deleteTime;
+
+      // Get delete timestamp for current user
+      if (chatData != null &&
+          chatData['deletedTimeStamp'] != null &&
+          chatData['deletedTimeStamp'][userId] != null) {
+        deleteTime =
+            (chatData['deletedTimeStamp'][userId] as Timestamp).toDate();
+      }
+
+      // Now get messages
+      return _firestore
+          .collection('chats')
+          .doc(chatId)
+          .collection('messages')
+          .orderBy('timestamp', descending: true)
+          .snapshots()
+          .map((snapshot) {
+            return snapshot.docs
+                .map((doc) => MessageModel.fromMap(doc.data(), doc.id))
+                .where((message) {
+                  // If user has deleted chat, only show messages after delete time
+                  if (deleteTime != null) {
+                    return message.timestamp.millisecondsSinceEpoch >=
+                        deleteTime.millisecondsSinceEpoch;
+                  }
+                  return true;
+                })
+                .toList();
+          });
+    });
   }
 
   //Reset Unread count for a user
@@ -91,17 +136,30 @@ class ChatService {
 
   /// Get all chats for a user
   Stream<List<ChatModel>> getUserChats(String userId) {
+    log("getting user chats");
     return _firestore
         .collection('chats')
         .where('users', arrayContains: userId)
         .orderBy('lastMessageTime', descending: true)
         .snapshots()
-        .map(
-          (snapshot) =>
-              snapshot.docs
-                  .map((doc) => ChatModel.fromMap(doc.data(), doc.id))
-                  .toList(),
-        );
+        .map((snapshot) {
+          log(" Raw documents: ${snapshot.docs.length}");
+
+          try {
+            final chats =
+                snapshot.docs
+                    .map((doc) => ChatModel.fromMap(doc.data(), doc.id))
+                    //  .where((chat) => chat.shouldShowOnHomeScreen(userId))
+                    .toList();
+
+            log(" Filtered chats: ${chats.length}");
+            return chats;
+          } catch (e) {
+            log(" ERROR in filter: $e");
+            log(" StackTrace: ${StackTrace.current}");
+            return [];
+          }
+        });
   }
 
   Future<void> markMessagesRead(String chatId, String userId) async {
@@ -152,15 +210,22 @@ class ChatService {
   }
 
   // Delete chat for specific User
+
   Future<void> deletedChatForUser(String chatID, String userId) async {
-    await _firestore.collection('chats').doc(chatID).update({
-      'deletedForUsers': FieldValue.arrayUnion([userId]),
-    });
-    log('chat delete for current user');
+    try {
+      await _firestore.collection('chats').doc(chatID).update({
+        'deletedForUsers': FieldValue.arrayUnion([userId]),
+        'deletedTimeStamp.$userId': FieldValue.serverTimestamp(),
+      });
+      log(' Chat deleted for user: $userId');
+    } catch (e) {
+      log(' Error deleting chat: $e');
+    }
   }
 
   // Get only active chats
   Stream<List<ChatModel>> getOnlyActiveChats(String userID) {
+    log(" getOnlyActiveChats called for user:");
     return _firestore
         .collection('chats')
         .where('users', arrayContains: userID)

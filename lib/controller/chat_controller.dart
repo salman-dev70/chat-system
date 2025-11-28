@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 
+import 'package:chat_system/controller/all_chats_controller.dart';
 import 'package:chat_system/controller/users_controller.dart';
 import 'package:chat_system/models/chat_model.dart';
 import 'package:chat_system/models/message_model.dart';
@@ -33,18 +34,44 @@ class ChatController extends GetxController {
   void _listenMessages() {
     if (currentChatId.value.isEmpty) return;
 
-    _chatRepo.getMessages(currentChatId.value).listen((msgs) {
-      messages.value = msgs;
+    _chatRepo.getMessages(currentChatId.value, _chatRepo.currentUserId).listen((
+      allMessages,
+    ) {
+      //  GET CURRENT CHAT DETAILS FOR FILTERING
+      messages.value = allMessages;
 
-      // Update unread count: messages not read by current user
+      // Update unread count
       unreadCount.value =
-          msgs
+          messages
               .where(
                 (msg) => !msg.isRead && msg.senderId != _chatRepo.currentUserId,
               )
               .length;
     });
   }
+
+  // // get Filtered Messages
+  // List<MessageModel> _getFilteredMessages(
+  //   List<MessageModel> allMessages,
+  //   ChatModel chat,
+  //   String userId,
+  // ) {
+  //   // Agar chat delete nahi ki, toh saare messages dikhao
+  //   if (!chat.isDeletedForUser(userId)) {
+  //     return allMessages;
+  //   }
+
+  //   // Delete time get karein
+  //   final deleteTime = chat.getDeleteTimeForUser(userId);
+  //   if (deleteTime == null) {
+  //     return allMessages; // Agar delete time nahi hai, toh saare messages
+  //   }
+
+  //   // Sirf delete time ke baad wale messages dikhao
+  //   return allMessages
+  //       .where((message) => message.timestamp.isAfter(deleteTime))
+  //       .toList();
+  // }
 
   /// Create or get chat and initialize messages
   Future<void> createOrGetChat({required UserModel otherUser}) async {
@@ -70,19 +97,21 @@ class ChatController extends GetxController {
 
     _messagesSub?.cancel();
 
-    _messagesSub = _chatRepo.getMessages(currentChatId.value).listen((msgs) {
-      messages.value = msgs;
-      log('get messages');
+    _messagesSub = _chatRepo
+        .getMessages(currentChatId.value, _chatRepo.currentUserId)
+        .listen((msgs) {
+          messages.value = msgs;
+          log('get messages');
 
-      // Update unread count
-      unreadCount.value =
-          msgs
-              .where((msg) => !msg.isRead && msg.senderId != currentUserId)
-              .length;
-      markAllMessagesAsRead(currentChatId.value);
-      // Reset unread count in DB
-      _chatRepo.resetUnreadCount(currentChatId.value, currentUserId);
-    });
+          // Update unread count
+          unreadCount.value =
+              msgs
+                  .where((msg) => !msg.isRead && msg.senderId != currentUserId)
+                  .length;
+          markAllMessagesAsRead(currentChatId.value);
+          // Reset unread count in DB
+          _chatRepo.resetUnreadCount(currentChatId.value, currentUserId);
+        });
   }
 
   Future<void> sendMessage(String text, String receiverId) async {

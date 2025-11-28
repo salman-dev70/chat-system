@@ -70,7 +70,7 @@ class AllChatsController extends GetxController {
     isLoading.value = true;
 
     _chatRepo
-        .getUserChats(_chatRepo.currentUserId)
+        .getOnlyActiveChats(_chatRepo.currentUserId)
         .listen(
           (chats) {
             allChats.value = chats;
@@ -101,7 +101,7 @@ class AllChatsController extends GetxController {
             int listenersStarted = 0;
             for (var chat in chats) {
               log(" STARTING message listener for: ${chat.id}");
-              _listenChatMessages(chat.id);
+              _listenChatMessages(chat.id, chat);
               listenersStarted++;
             }
 
@@ -122,16 +122,14 @@ class AllChatsController extends GetxController {
         );
   }
 
-  /// Listen messages for a specific chat to get last message & unread count
-
-  void _listenChatMessages(String chatId) {
+  void _listenChatMessages(String chatId, ChatModel chat) {
     log(" _listenChatMessages ENTERED for: $chatId");
 
     try {
       log(" Calling _chatRepo.getMessages($chatId)");
 
       _messageSubscriptions[chatId] = _chatRepo
-          .getMessages(chatId)
+          .getMessages(chatId, _chatRepo.currentUserId)
           .listen(
             (messages) {
               log(
@@ -139,34 +137,54 @@ class AllChatsController extends GetxController {
               );
 
               Future.microtask(() {
+                //  FIX: Filter messages based on deletedTimeStamp
+                final deleteTime = chat.getDeleteTimeForUser(
+                  _chatRepo.currentUserId,
+                );
+
+                List<MessageModel> filteredMessages = messages;
+
+                if (deleteTime != null) {
+                  filteredMessages =
+                      messages
+                          .where((msg) => msg.timestamp.isAfter(deleteTime))
+                          .toList();
+                  log(
+                    " Filtered messages for $chatId: ${filteredMessages.length}/${messages.length}",
+                  );
+                }
+
                 if (_openChats.contains(chatId)) {
                   log(" Chat $chatId OPEN - Unread: 0");
                   lastMessages[chatId] =
-                      messages.isNotEmpty ? messages.first : null;
+                      filteredMessages.isNotEmpty
+                          ? filteredMessages.first
+                          : null;
                   unreadCounts[chatId] = 0;
                   return;
                 }
 
-                if (messages.isNotEmpty) {
-                  lastMessages[chatId] = messages.first;
-                  int currentUnread = unreadCounts[chatId] ?? 0;
+                if (filteredMessages.isNotEmpty) {
+                  lastMessages[chatId] = filteredMessages.first;
+
                   int actualUnread =
-                      messages
+                      filteredMessages
                           .where(
                             (msg) =>
                                 !msg.isRead &&
                                 msg.senderId != _chatRepo.currentUserId,
                           )
                           .length;
-                  if (actualUnread > currentUnread) {
-                    unreadCounts[chatId] = actualUnread;
-                    log(" New message - Unread: $actualUnread");
-                  }
+                  unreadCounts[chatId] = actualUnread;
+                  update();
+                  log(" Unread count for $chatId: $actualUnread");
                 } else {
+                  //  No messages after filtering - show empty state
                   lastMessages[chatId] = null;
                   unreadCounts[chatId] = 0;
-                  log(" No messages for $chatId");
+                  log(" No messages for $chatId after filtering");
                 }
+                update();
               });
             },
             onError: (error) {
@@ -180,6 +198,65 @@ class AllChatsController extends GetxController {
       log(" EXCEPTION in _listenChatMessages: $e");
     }
   }
+
+  /// Listen messages for a specific chat to get last message & unread count
+
+  // void _listenChatMessages(String chatId,ChatModel chat) {
+  //   log(" _listenChatMessages ENTERED for: $chatId");
+
+  //   try {
+  //     log(" Calling _chatRepo.getMessages($chatId)");
+
+  //     _messageSubscriptions[chatId] = _chatRepo
+  //         .getMessages(chatId, _chatRepo.currentUserId)
+  //         .listen(
+  //           (messages) {
+  //             log(
+  //               " MESSAGES RECEIVED for $chatId: ${messages.length} messages",
+  //             );
+
+  //             Future.microtask(() {
+  //               if (_openChats.contains(chatId)) {
+  //                 log(" Chat $chatId OPEN - Unread: 0");
+  //                 lastMessages[chatId] =
+  //                     messages.isNotEmpty ? messages.first : null;
+  //                 unreadCounts[chatId] = 0;
+  //                 return;
+  //               }
+
+  //               if (messages.isNotEmpty) {
+  //                 lastMessages[chatId] = messages.first;
+  //                 int currentUnread = unreadCounts[chatId] ?? 0;
+  //                 int actualUnread =
+  //                     messages
+  //                         .where(
+  //                           (msg) =>
+  //                               !msg.isRead &&
+  //                               msg.senderId != _chatRepo.currentUserId,
+  //                         )
+  //                         .length;
+  //                 if (actualUnread > currentUnread) {
+  //                   unreadCounts[chatId] = actualUnread;
+  //                   log(" New message - Unread: $actualUnread");
+  //                 }
+  //               } else {
+  //                 lastMessages[chatId] = null;
+  //                 unreadCounts[chatId] = 0;
+  //                 log(" No messages for $chatId");
+  //               }
+  //             });
+  //           },
+  //           onError: (error) {
+  //             log(" STREAM ERROR for $chatId: $error");
+  //           },
+  //           cancelOnError: false,
+  //         );
+
+  //     log(" Subscription CREATED for $chatId");
+  //   } catch (e) {
+  //     log(" EXCEPTION in _listenChatMessages: $e");
+  //   }
+  // }
 
   void resetForNewUser() {
     log(" RESETTING AllChatsController for new user");

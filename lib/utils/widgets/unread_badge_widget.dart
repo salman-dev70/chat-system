@@ -13,7 +13,7 @@ class UnreadBadge extends StatelessWidget {
     return Obx(() {
       final AllChatsController allChatsController =
           Get.find<AllChatsController>();
-      int count = allChatsController.getUnreadCount(chatId);
+      int count = allChatsController.unreadCounts[chatId] ?? 0;
 
       if (count > 0) {
         return CircleAvatar(
